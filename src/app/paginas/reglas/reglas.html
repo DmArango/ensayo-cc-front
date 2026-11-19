@@ -1,0 +1,101 @@
+<div class="wrap">
+  <div class="head">
+    <div>
+      <h1>Reglas de calidad</h1>
+      <p class="lead">Las reglas vigentes, cómo se crearon y cuántos casos tienen pendientes. Para cambiar una, ábrela con el analista: se crea una versión nueva y la anterior se conserva.</p>
+    </div>
+    @if (sesion.puede('gestor')) {
+      <div class="acc"><button class="btn btn-dark" (click)="nueva()"><svg class="i" style="width:15px;height:15px"><use href="#i-spark" /></svg>Nueva regla con el analista</button></div>
+    }
+  </div>
+  <div class="toolbar">
+    <div class="seg" role="group" aria-label="Tipo de regla">
+      <button [attr.aria-pressed]="filtro() === 'todas'" (click)="filtrar('todas')">Todas</button>
+      <button [attr.aria-pressed]="filtro() === 'det'" (click)="filtrar('det')">Deterministas</button>
+      <button [attr.aria-pressed]="filtro() === 'ia'" (click)="filtrar('ia')">Con IA</button>
+    </div>
+  </div>
+  <div class="grid-r">
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Regla</th><th>Qué comprueba</th><th>Tipo</th><th class="num">Pendientes</th></tr></thead>
+        <tbody>
+          @if (!reglas()) {
+            <tr><td colspan="4"><div class="loading"><span class="spin"></span>Cargando…</div></td></tr>
+          } @else {
+            @for (r of lista(); track r.rule_id) {
+              <tr class="click" tabindex="0" [class.sel]="r.rule_id === actual()?.rule_id" [attr.aria-selected]="r.rule_id === actual()?.rule_id"
+                (click)="elegir(r)" (keydown)="tecla(r, $event)">
+                <td><span class="rid">{{ r.rule_id }}</span><span class="just">versión {{ r.version }}</span></td>
+                <td style="font-weight:500">{{ r.titulo }}<span class="just" style="font-weight:400">{{ r.autor }} · {{ r.creada }}</span></td>
+                <td>@if (r.tipo === 'ia_razonamiento') {<span class="tag tag-ia">Con IA</span>} @else {<span class="tag">Determinista</span>}</td>
+                <td class="num mono">{{ r.pendientes | fmt }}</td>
+              </tr>
+            } @empty {
+              <tr><td colspan="4" class="vacio">{{ (reglas() || []).length ? 'No hay reglas de este tipo.' : 'Todavía no hay reglas vigentes. Crea la primera con el analista.' }}</td></tr>
+            }
+          }
+        </tbody>
+      </table>
+    </div>
+    @if (actual(); as r) {
+      <div class="card rdet">
+        <div class="h">
+          <div class="tags"><span class="rid">{{ r.rule_id }}</span><span class="note">versión {{ r.version }}</span><span class="tag" [class.tag-ia]="r.tipo === 'ia_razonamiento'">{{ TIPO[r.tipo] || r.tipo }}</span></div>
+          <h2>{{ r.titulo }}</h2>
+        </div>
+        <div class="b">
+          <div class="frase">{{ r.descripcion }}</div>
+          <div>
+            <div class="kv"><span>Creada por</span><b>{{ r.autor }}</b></div>
+            <div class="kv"><span>Versión vigente desde</span><b>{{ r.creada }}</b></div>
+            <div class="kv"><span>Casos en la última ejecución</span><b>{{ r.casos | fmt }} · {{ r.pendientes | fmt }} pendientes</b></div>
+          </div>
+          <details class="tec" (toggle)="verVersiones(r, $event)">
+            <summary>Ver versiones ({{ r.versiones }})</summary>
+            @if (listaVersiones(r.rule_id); as vs) {
+              <ul class="versiones">
+                @for (v of vs; track v.version) {
+                  <li><span class="v">v{{ v.version }}</span><span>{{ v.titulo }}<span class="just">{{ v.autor }} · {{ v.creada }}{{ v.retirada ? ' · sustituida o retirada el ' + v.retirada : ' · vigente' }}</span></span></li>
+                }
+              </ul>
+            } @else if (versiones()[r.rule_id] === 'error') {
+              <p class="note" style="margin:8px 0 0">No se han podido cargar las versiones.</p>
+            } @else {
+              <div class="loading" style="padding:8px 0"><span class="spin"></span>Cargando…</div>
+            }
+          </details>
+          @if (conv().length) {
+            <details class="tec">
+              <summary>Ver la conversación que la originó</summary>
+              <ul class="convlist">
+                @for (x of conv(); track $index) {<li [class.u]="x.rol === 'usuario'"><b>{{ x.rol === 'usuario' ? 'Usuario' : 'Analista' }}</b>{{ x.texto }}</li>}
+              </ul>
+            </details>
+          }
+          <details class="tec">
+            <summary>Ver detalle técnico</summary>
+            <pre>{{ r.sql }}</pre>
+            @if (r.instruccion_ia) {<pre style="white-space:pre-wrap;margin-top:8px">{{ r.instruccion_ia }}</pre>}
+          </details>
+          @if (sesion.puede('gestor')) {
+            @if (confirmarRetirar()) {
+              <div class="confirm-box warn">
+                <span><b>¿Retirar {{ r.rule_id }}?</b> Dejará de ejecutarse y sus {{ r.pendientes | fmt }} casos pendientes ya no se revisarán ni se exportarán. La regla no se borra: queda en el historial.</span>
+                <span class="btns">
+                  <button class="btn btn-sm" (click)="confirmarRetirar.set(false)">Cancelar</button>
+                  <button class="btn btn-sm btn-danger" [disabled]="sesion.ocupado()" (click)="retirar(r)">Retirar la regla</button>
+                </span>
+              </div>
+            } @else {
+              <div class="btns">
+                <button class="btn btn-dark btn-sm" (click)="modificar(r)"><svg class="i" style="width:14px;height:14px"><use href="#i-spark" /></svg>Modificar con el analista</button>
+                <button class="btn btn-sm btn-danger" (click)="retirar(r)">Retirar</button>
+              </div>
+            }
+          }
+        </div>
+      </div>
+    }
+  </div>
+</div>

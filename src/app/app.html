@@ -1,0 +1,61 @@
+@if (sesion.sinAcceso()) {
+  <div class="acceso">
+    <div class="card">
+      <svg class="logo" viewBox="0 0 156 39" aria-hidden="true"><use href="#logo" /></svg>
+      <h1>Calidad del maestro de clientes</h1>
+      <p class="lead">{{ sesion.sinAcceso() }}</p>
+      <button class="btn" (click)="recargar()">Volver a intentarlo</button>
+    </div>
+  </div>
+} @else {
+  <div class="app">
+    <aside class="side">
+      <a class="logo-link" routerLink="/" aria-label="Acerinox · Calidad del maestro de clientes: ir al inicio" title="Ir al inicio">
+        <svg class="logo" viewBox="0 0 156 39" aria-hidden="true"><use href="#logo" /></svg>
+        <span class="prod">Calidad del maestro<br>de clientes</span>
+      </a>
+      <div class="nav-t">Trabajo</div>
+      <nav class="nav" aria-label="Trabajo">
+        @if (sesion.puede('gestor')) {
+          <a class="nav-i" routerLink="/analista" routerLinkActive="activo" ariaCurrentWhenActive="page" aria-label="Analista IA" title="Analista IA"><svg><use href="#i-spark" /></svg><span>Analista</span><em class="ia">IA</em></a>
+          <a class="nav-i" routerLink="/conversaciones" routerLinkActive="activo" ariaCurrentWhenActive="page" aria-label="Conversaciones" title="Conversaciones"><svg><use href="#i-chat" /></svg><span>Conversaciones</span></a>
+        }
+        <a class="nav-i" routerLink="/incidencias" routerLinkActive="activo" ariaCurrentWhenActive="page" [attr.aria-label]="'Incidencias' + (sesion.inicio()?.run_id ? ': ' + (sesion.inicio()!.pendientes | fmt) + ' pendientes' : '')" title="Incidencias"><svg><use href="#i-inbox" /></svg><span>Incidencias</span><em>{{ sesion.inicio()?.run_id ? (sesion.inicio()!.pendientes | fmt) : '' }}</em></a>
+        <a class="nav-i" routerLink="/reglas" routerLinkActive="activo" ariaCurrentWhenActive="page" aria-label="Reglas" title="Reglas"><svg><use href="#i-rule" /></svg><span>Reglas</span><em>{{ sesion.inicio()?.reglas | fmt }}</em></a>
+        <a class="nav-i" routerLink="/historial" routerLinkActive="activo" ariaCurrentWhenActive="page" aria-label="Historial" title="Historial"><svg><use href="#i-clock" /></svg><span>Historial</span></a>
+      </nav>
+      <div class="nav-t">Conocimiento</div>
+      <nav class="nav" aria-label="Conocimiento">
+        <a class="nav-i" routerLink="/datos" routerLinkActive="activo" ariaCurrentWhenActive="page" aria-label="Datos y campos" title="Datos y campos"><svg><use href="#i-db" /></svg><span>Datos y campos</span></a>
+        <a class="nav-i" routerLink="/contexto" routerLinkActive="activo" ariaCurrentWhenActive="page" aria-label="Contexto de negocio" title="Contexto de negocio"><svg><use href="#i-book" /></svg><span>Contexto de negocio</span></a>
+      </nav>
+      <div class="side-foot">
+        <div class="avatar" [attr.title]="sesion.yo()?.correo + ' · ' + sesion.perfiles()" aria-hidden="true">{{ iniciales(sesion.yo()?.correo) }}</div>
+        <div class="quien"><b [attr.title]="sesion.yo()?.correo">{{ nombreDeCorreo(sesion.yo()?.correo) || sesion.yo()?.correo }}</b><small>{{ sesion.perfiles() }}</small></div>
+      </div>
+    </aside>
+
+    <main>
+      <header class="top">
+        <div class="crumb">Calidad del maestro de clientes &nbsp;/&nbsp; <b>{{ titulo.actual() }}</b></div>
+        <div class="run">
+          @if (revision.ejecucion()) {
+            <span class="spin"></span> Ejecutando las reglas…
+          } @else if (sesion.inicio()?.run_id) {
+            Última ejecución <b>{{ sesion.inicio()!.inicio }}</b>
+          } @else if (sesion.inicio()) {
+            Sin ejecuciones
+          }
+        </div>
+      </header>
+
+      <div class="content">
+        @if (sesion.error()) {
+          <div class="banner" role="alert"><span>{{ sesion.error() }}</span><button aria-label="Cerrar" (click)="sesion.error.set('')">×</button></div>
+        }
+        <router-outlet />
+      </div>
+    </main>
+  </div>
+}
+<div class="toast" [class.show]="sesion.aviso()" role="status">{{ sesion.aviso() }}</div>

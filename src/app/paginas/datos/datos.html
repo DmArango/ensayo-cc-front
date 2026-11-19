@@ -1,0 +1,54 @@
+<div class="wrap">
+  <div class="head">
+    <div>
+      <h1>Datos y campos</h1>
+      <p class="lead">El diccionario que usa el analista para traducir lo que pides a datos. Solo puede usar lo que está documentado aquí, y entiende un campo tan bien como esté explicado. Es la única pantalla con nombres técnicos.</p>
+    </div>
+  </div>
+  @if (sesion.puede('administrador')) {
+    @if (editando(); as e) {
+      <div class="modbar">
+        <span>Editando <b class="mono">{{ nombre(e) }}</b>: cambia la explicación y guarda.</span>
+        <button class="link" (click)="cancelar()">Cancelar</button>
+      </div>
+    }
+    <div class="cform">
+      <input placeholder="Tabla, p. ej. dim_corp_customer" aria-label="Tabla" [value]="form().tabla" [readOnly]="!!editando()" (input)="campo('tabla', $event)">
+      <input placeholder="Columna (vacía: la tabla)" aria-label="Columna" [value]="form().columna" [readOnly]="!!editando()" (input)="campo('columna', $event)">
+      <input placeholder="Qué significa, en lenguaje de negocio" aria-label="Qué significa" [value]="form().significado" (input)="campo('significado', $event)" (keydown.enter)="guardar()">
+      <button class="btn btn-dark" [disabled]="sesion.ocupado()" (click)="guardar()">{{ editando() ? 'Guardar cambios' : 'Añadir' }}</button>
+    </div>
+    @if (error()) {<div class="form-err" role="alert">{{ error() }}</div>}
+  }
+  <div class="toolbar">
+    <input class="search" type="search" placeholder="Buscar tabla, columna o significado" aria-label="Buscar" (input)="q.set($any($event.target).value)">
+    <span class="muted push" style="font-size:12.5px">{{ documentados() | fmt }} campos documentados</span>
+  </div>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Tabla</th><th>Columna</th><th>Qué significa</th><th><span class="vh">Acciones</span></th></tr></thead>
+      <tbody>
+        @if (!dic()) {
+          <tr><td colspan="4"><div class="loading"><span class="spin"></span>Cargando…</div></td></tr>
+        } @else {
+          @for (d of lista(); track d.tabla + '.' + d.columna) {
+            <tr [class.sel]="editando() && nombre(editando()!) === nombre(d)">
+              <td class="mono" style="font-weight:500">{{ d.tabla }}</td>
+              <td>@if (d.columna) {<span class="mono">{{ d.columna }}</span>} @else {<span class="muted" style="font-size:12.5px">descripción de la tabla</span>}</td>
+              <td>{{ d.significado }}</td>
+              <td style="white-space:nowrap">
+                @if (sesion.puede('administrador')) {
+                  <button class="link" (click)="editar(d)">Editar</button>
+                  <span class="muted"> · </span>
+                  <button class="link danger" (click)="borrar(d)">{{ quitar() === nombre(d) ? '¿Quitar? Pulsa otra vez' : 'Quitar' }}</button>
+                }
+              </td>
+            </tr>
+          } @empty {
+            <tr><td colspan="4" class="vacio">{{ q() ? 'Nada coincide con la búsqueda.' : 'El diccionario está vacío.' }}</td></tr>
+          }
+        }
+      </tbody>
+    </table>
+  </div>
+</div>

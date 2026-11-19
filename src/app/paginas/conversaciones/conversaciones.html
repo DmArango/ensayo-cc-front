@@ -1,0 +1,49 @@
+<div class="wrap estrecho">
+  <div class="head">
+    <div>
+      <h1>Conversaciones</h1>
+      <p class="lead">Tus conversaciones con el analista del último año. Abre una para seguir donde la dejaste o para ver cómo se creó una regla.</p>
+    </div>
+    <div class="acc"><button class="btn btn-dark" (click)="nueva()"><svg class="i" style="width:14px;height:14px"><use href="#i-plus" /></svg>Nueva conversación</button></div>
+  </div>
+
+  <div class="toolbar">
+    <input class="search" type="search" placeholder="Buscar en tus mensajes" aria-label="Buscar en las conversaciones"
+      (input)="buscar($event)" (keydown.enter)="buscar($event, true)">
+    @if (lista(); as l) {<span class="note push">{{ l.length }}{{ hayMas() ? '+' : '' }} {{ l.length === 1 ? 'conversación' : 'conversaciones' }}</span>}
+  </div>
+
+  @if (!lista()) {
+    <div class="card"><div class="loading"><span class="spin"></span>Cargando…</div></div>
+  } @else {
+    @for (g of grupos(); track g.t) {
+      <section class="conv-grupo" [attr.aria-label]="g.t">
+        <h2 class="conv-grupo-t">{{ g.t }}</h2>
+        <ul class="conv-lista card">
+          @for (x of g.l; track x.conversacion_id) {
+            <li>
+              <button class="conv-i" [attr.aria-current]="x.conversacion_id === c.id() ? 'true' : null" (click)="abrir(x.conversacion_id)">
+                <svg class="i"><use href="#i-chat" /></svg>
+                <span class="t">{{ x.primer_mensaje || 'Conversación sin mensajes' }}</span>
+                <span class="meta">
+                  @for (r of x.reglas || []; track r) {<span class="tag tag-ok" [attr.title]="'Activó la regla ' + r">{{ r }}</span>}
+                  @if (x.mensajes) {<span>{{ x.mensajes }} {{ x.mensajes === 1 ? 'mensaje' : 'mensajes' }}</span>}
+                  <span class="cnt">{{ cuando(x.ultima) }}</span>
+                </span>
+              </button>
+            </li>
+          }
+        </ul>
+      </section>
+    } @empty {
+      <div class="card"><div class="vacio">
+        @if (q()) {No hay conversaciones con «{{ q() }}».} @else {Todavía no has hablado con el analista. Empieza una conversación nueva.}
+      </div></div>
+    }
+    @if (hayMas()) {
+      <button class="btn" style="margin-top:4px" [disabled]="cargandoMas()" (click)="cargar(true)">
+        @if (cargandoMas()) {<span class="spin"></span>}Ver conversaciones anteriores
+      </button>
+    }
+  }
+</div>

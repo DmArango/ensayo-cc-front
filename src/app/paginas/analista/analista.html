@@ -1,0 +1,384 @@
+<div class="an" [class.con-panel]="c.panel()">
+  <div class="an-chat">
+    <div class="an-scroll" #chatScroll (scroll)="alDesplazar()">
+      <div class="an-col">
+        @if (enHeroe()) {
+          <div class="hero">
+            <div class="hero-mark"><svg><use href="#i-spark" /></svg></div>
+            <h1>¿Qué necesitas gestionar en el maestro de clientes?</h1>
+            <p class="lead">Explícalo como se lo contarías a un compañero. El analista consulta los datos, prueba la regla sobre el maestro y te enseña casos reales para que los confirmes. Nada se activa ni se corrige sin tu aprobación.</p>
+            <ng-container [ngTemplateOutlet]="composer" />
+            @if (!c.reglaBase()) {
+              <div class="ejemplos" role="group" aria-label="Peticiones de ejemplo">
+                @for (e of EJEMPLOS; track e) {<button class="ejemplo" (click)="usarEjemplo(e)">{{ e }}</button>}
+              </div>
+            }
+
+            @if (c.recientes()?.length) {
+              @let rs = c.recientes()!;
+              <div class="recientes">
+                <div class="sec-t">Tus conversaciones recientes</div>
+                @for (r of rs.slice(0, 5); track r.conversacion_id) {
+                  <button class="reciente" (click)="abrirReciente(r.conversacion_id)">
+                    <span class="t">{{ r.primer_mensaje || 'Conversación sin mensajes' }}</span>
+                    <span class="when">{{ fecha(r.ultima) }}</span>
+                  </button>
+                }
+                <a class="link" style="align-self:flex-start" routerLink="/conversaciones">Ver todas las conversaciones</a>
+              </div>
+            }
+
+            <div class="overview">
+              @let i = sesion.inicio();
+              <div class="card ov">
+                <h3>Estado del maestro</h3>
+                @if (!i) {
+                  <div class="loading"><span class="spin"></span>Cargando…</div>
+                } @else if (i.run_id) {
+                  @let p = calidad(i.registros, i.registros_con_incidencias);
+                  <div class="score">
+                    <b class="cnt">{{ p }} %</b>
+                    <div>
+                      <strong>de los clientes, sin incidencias pendientes</strong>
+                      <span>{{ i.registros - i.registros_con_incidencias | fmt }} de {{ i.registros | fmt }}</span>
+                    </div>
+                  </div>
+                  <app-recorrido [compacto]="true" [pendientes]="i.pendientes" [porExportar]="i.por_exportar" [exportadas]="i.exportadas" [rechazadas]="i.rechazadas" />
+                } @else {
+                  <p class="note" style="margin:0">Aún no se han ejecutado las reglas.</p>
+                }
+              </div>
+              <div class="card ov">
+                <h3>Principales hallazgos</h3>
+                @for (h of i?.hallazgos || []; track h.rule_id) {
+                  <div class="find"><span class="dot" [class.ia]="h.tipo === 'ia_razonamiento'"></span><span>{{ h.titulo }}</span><span class="n">{{ h.n | fmt }}</span></div>
+                }
+                @if ((i?.hallazgos || []).length) {
+                  <a class="link" style="margin-top:8px;display:inline-block" routerLink="/incidencias">Ver incidencias</a>
+                } @else if (i) {
+                  <p class="note" style="margin:0">Sin incidencias pendientes.</p>
+                }
+              </div>
+              <div class="card ov wide">
+                <h3>Lo que conoce el analista</h3>
+                @if (i) {
+                  <div class="conoce">
+                    <a routerLink="/datos"><b>{{ i.campos | fmt }}</b><span>Campos documentados</span></a>
+                    <a routerLink="/datos"><b>{{ i.tablas | fmt }}</b><span>Tablas</span></a>
+                    <a routerLink="/contexto"><b>{{ i.conocimiento | fmt }}</b><span>Notas de negocio</span></a>
+                    <a routerLink="/reglas"><b>{{ i.reglas | fmt }}</b><span>Reglas vigentes</span></a>
+                  </div>
+                } @else {
+                  <div class="loading"><span class="spin"></span>Cargando…</div>
+                }
+                <div class="guard">
+                  <div><svg><use href="#i-check" /></svg>Solo usa los campos y el conocimiento documentados.</div>
+                  <div><svg><use href="#i-check" /></svg>Consulta los datos en modo lectura antes de proponer.</div>
+                  <div><svg><use href="#i-check" /></svg>Prueba cada regla y la revisa si marca demasiado.</div>
+                  <div><svg><use href="#i-check" /></svg>Activar y exportar son decisiones de personas, con historial.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        } @else {
+          <div class="conv-head">
+            <b class="conv-tit" [attr.title]="c.titulo() || null">{{ c.titulo() || 'Nueva conversación' }}</b>
+            <span class="btns" style="margin-left:auto;display:flex;gap:6px">
+              <details class="recientes-menu" #menuRec (toggle)="verRecientes($event)">
+                <summary class="btn btn-sm">Recientes</summary>
+                <div class="lista-rec">
+                  @if (!c.recientes()) {
+                    <div class="loading" style="padding:8px"><span class="spin"></span>Cargando…</div>
+                  } @else {
+                    @for (r of c.recientes()!; track r.conversacion_id) {
+                      <button class="reciente" [attr.aria-current]="r.conversacion_id === c.id()" (click)="abrirReciente(r.conversacion_id, menuRec)">
+                        <span class="t">{{ r.primer_mensaje || 'Conversación sin mensajes' }}</span>
+                        <span class="when">{{ fecha(r.ultima) }}</span>
+                      </button>
+                    } @empty {
+                      <p class="note" style="margin:8px">Todavía no tienes conversaciones.</p>
+                    }
+                    <a class="link" style="margin:6px 8px 4px" routerLink="/conversaciones">Ver todas las conversaciones</a>
+                  }
+                </div>
+              </details>
+              <button class="btn btn-sm" (click)="nueva()"><svg class="i" style="width:14px;height:14px"><use href="#i-plus" /></svg>Nueva conversación</button>
+            </span>
+          </div>
+        }
+
+        @if (c.reglaBase(); as b) {
+          <div class="modbar">
+            <svg><use href="#i-spark" /></svg>
+            <span>Modificando <b>{{ b.rule_id }}</b> · {{ b.titulo }} (versión {{ b.version }}). Al activar se creará la versión {{ b.version + 1 }}.</span>
+            <button class="link" (click)="nueva()">Dejar de modificar</button>
+          </div>
+        }
+        @if (c.cargando()) {
+          <div class="loading"><span class="spin"></span>Recuperando la conversación…</div>
+        }
+
+        <div class="thread">
+          @for (m of c.mensajes(); track $index; let idx = $index) {
+            @if (m.rol === 'usuario') {
+              <div class="msg-u">{{ m.texto }}</div>
+              @if (m.estado === 'error' || m.estado === 'interrumpida' || m.estado === 'cancelada') {
+                <div class="msg-fallo">
+                  <span>{{ textoFallo(m) }}</span>
+                  <button class="link" (click)="c.reenviar(m)" [disabled]="c.ocupado()">Volver a enviar</button>
+                </div>
+              }
+            } @else {
+              <div class="msg-a">
+                <div class="ai-av"><svg><use href="#i-spark" /></svg></div>
+                <div class="body">
+                  <div class="who"><b>Analista</b>@if (m.segundos) {<span class="cnt">{{ m.segundos }} s</span>}</div>
+                  @if (m.traza?.length) {
+                    <ul class="traza">
+                      @for (t of m.traza; track $index) {<li [class.ko]="t.ok === false">{{ t.texto }}</li>}
+                    </ul>
+                  }
+                  <div class="txt">{{ m.texto }}</div>
+                  <div class="msg-acc"><button class="icon-btn mini" title="Copiar la respuesta" aria-label="Copiar la respuesta" (click)="copiar(m)"><svg class="i"><use href="#i-copy" /></svg></button></div>
+                  @if (esUltima(idx)) {
+                    @if (m.propuesta?.preguntas?.length && m.propuesta!.tipo !== 'consulta') {
+                      <div class="dudas" [class.ok]="c.aceptaSupuestos()">
+                        <b>{{ c.aceptaSupuestos() || c.activada() ? 'Seguimos con los supuestos' : 'Antes de enseñarte la regla, tengo dudas' }}</b>
+                        <ol>@for (q of m.propuesta!.preguntas; track $index) {<li>{{ q }}</li>}</ol>
+                        @if (c.dudasPendientes()) {
+                          <p class="note" style="margin:10px 0 0">La regla y su prueba sobre el maestro se enseñan cuando respondas o aceptes lo que he supuesto.</p>
+                          <div class="btns"><button class="btn btn-sm btn-dark" (click)="responderDudas()">Responder</button><button class="btn btn-sm" (click)="seguirConSupuestos()">Sigue con los supuestos y ver la propuesta</button></div>
+                        }
+                      </div>
+                    }
+                    @if (tienePanel(m)) {
+                      <button class="chip-prop" (click)="verPanel()">
+                        <svg class="i"><use href="#i-rule" /></svg>
+                        <span class="t">{{ m.propuesta!.titulo || TIPO[m.propuesta!.tipo] }}</span>
+                        <span class="k">{{ chipCuenta(m) }}</span>
+                        <span class="go">Ver {{ m.propuesta!.tipo === 'consulta' ? 'resultado' : 'propuesta' }}</span>
+                      </button>
+                    }
+                  }
+                </div>
+              </div>
+            }
+          }
+          @if (c.enCurso(); as ec) {
+            <div class="msg-a pending">
+              <div class="ai-av"><svg><use href="#i-spark" /></svg></div>
+              <div class="body">
+                <div class="who"><b>Analista</b></div>
+                <div class="txt">
+                  <div class="thinking"><span class="sh">{{ ec.cancelando ? 'Cancelando…' : 'Analizando tu petición' }}</span><b>{{ c.reloj() }} s</b></div>
+                  <div class="prog"><i></i></div>
+                  @if (ec.pasos.length) {
+                    <ul class="traza vivo">
+                      @for (p of ec.pasos; track $index) {<li [class.ko]="p.ok === false">{{ p.texto }}</li>}
+                    </ul>
+                  }
+                  <p class="note" style="margin:0">Puede tardar unos minutos. Puedes ir a otras páginas: la respuesta te espera aquí. Para detenerlo, pulsa Esc o «Detener».</p>
+                </div>
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+    @if (!enHeroe() && lejosDelFinal()) {
+      <button class="al-final" (click)="irAlFinal()" aria-label="Ir al final de la conversación"><svg class="i"><use href="#i-down" /></svg></button>
+    }
+    @if (!enHeroe()) {
+      <div class="an-foot"><div class="an-col"><ng-container [ngTemplateOutlet]="composer" /></div></div>
+    }
+  </div>
+
+  @if (c.panel(); as m) {
+    <aside class="an-panel" #panel [class.stale]="c.ocupado()" aria-label="Propuesta del analista">
+      @let p = m.propuesta!;
+      @let pr = m.prueba;
+      @if (p.tipo === 'consulta') {
+        <div class="prop">
+          <div class="prop-h"><div class="tags"><span class="tag">{{ TIPO['consulta'] }}</span></div><h2>Análisis de los datos</h2><p class="note" style="margin:6px 0 0">{{ p.titulo }}</p></div>
+          <div class="prop-sec">
+            @if (!pr) {
+              <p class="note">No hay resultado.</p>
+            } @else if (!pr.ok) {
+              <div class="notice">No se ha podido hacer el análisis: {{ pr.error }}</div>
+            } @else if (pr.filas?.length) {
+              <div class="tabla-res">
+                <table>
+                  <thead><tr>@for (col of columnas(pr); track col) {<th>{{ col.replaceAll('_', ' ') }}</th>}</tr></thead>
+                  <tbody>
+                    @for (f of pr.filas; track $index) {
+                      <tr>@for (col of columnas(pr); track col) {<td [class.num]="esNumero(f[col])">{{ celda(f[col]) }}</td>}</tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+              <p class="note" style="margin:10px 0 0">{{ pr.filas!.length | fmt }} filas{{ pr.filas!.length >= 200 ? ' (se muestran las 200 primeras)' : '' }}. Pide al analista que convierta lo que veas en una regla.</p>
+            } @else {
+              <p class="note">La consulta no devuelve filas.</p>
+            }
+          </div>
+          <div class="prop-sec" style="border-bottom:0"><ng-container [ngTemplateOutlet]="tecnico" [ngTemplateOutletContext]="{ m }" /></div>
+        </div>
+      } @else {
+        @let r = revision()!;
+        <div class="prop">
+          <div class="prop-h">
+            <div class="tags">
+              <span class="tag" [class.tag-ia]="r.ia">{{ TIPO[p.tipo] }}</span>
+              <span class="tag" [class.tag-ok]="c.activada()" [class.tag-warn]="!c.activada()"><span class="d"></span>{{ c.activada() ? 'Activada' : 'Pendiente de aprobación' }}</span>
+            </div>
+            <h2>{{ p.titulo || 'Regla propuesta' }}</h2>
+          </div>
+
+          @if (!pr) {
+            <div class="prop-sec"><p class="note">La regla no se ha podido probar.</p></div>
+          } @else if (!pr.ok) {
+            <div class="prop-sec"><div class="notice"><b>La prueba ha dado un error.</b> {{ pr.error }} Pídele al analista que lo corrija.</div></div>
+          } @else if (r.ia) {
+            <div class="prop-sec">
+              <div class="sec-t">Prueba con IA sobre una muestra</div>
+              <div class="metrics">
+                <div class="metric"><div class="v">{{ pr.candidatos | fmt }}</div><div class="l">textos que revisaría la IA</div></div>
+                <div class="metric"><div class="v">{{ pr.marcados | fmt }} de {{ pr.evaluados | fmt }}</div><div class="l">marcados en la muestra</div></div>
+                <div class="metric"><div class="v">≈ {{ estimados(pr) | fmt }}</div><div class="l">casos estimados</div></div>
+              </div>
+            </div>
+            <div class="prop-sec">
+              <div class="sec-t">Confirma la muestra<span class="r">evaluada con IA</span></div>
+              @if (pr.muestra?.length) {
+                <div class="casos">
+                  @for (f of pr.muestra; track $index) {
+                    @let k = clave(f, true);
+                    <div class="caso" [class.si]="c.conf()[k] === 'si'" [class.no]="c.conf()[k] === 'no'">
+                      <div class="caso-h">
+                        <b>{{ f.nombre || 'Cliente ' + f.an8 }}</b>
+                        @if (f.incumple) {<span class="tag tag-bad">La IA lo marca</span>} @else {<span class="tag tag-ok">Correcto</span>}
+                        <span class="mono">{{ f.an8 }}</span>
+                      </div>
+                      <div class="texto cur-t">{{ f.valor_actual }}</div>
+                      @if (f.propuesta) {<div class="texto new-t">{{ f.propuesta }}</div>}
+                      <div class="motivo">{{ f.justificacion }}</div>
+                      <div class="caso-f"><span class="q">¿Es correcto el veredicto?</span><ng-container [ngTemplateOutlet]="botonesConf" [ngTemplateOutletContext]="{ k, n: f.nombre || 'el cliente ' + f.an8 }" /></div>
+                    </div>
+                  }
+                </div>
+              } @else {
+                <p class="note">No hay clientes que evaluar.</p>
+              }
+            </div>
+          } @else {
+            <div class="prop-sec">
+              <div class="sec-t">Prueba sobre el maestro</div>
+              <div class="metrics">
+                <div class="metric"><div class="v">{{ pr.casos | fmt }}</div><div class="l">casos que marcaría</div></div>
+                <div class="metric"><div class="v">{{ pct(pr.registros, pr.evaluados) }} %</div><div class="l">de {{ pr.evaluados | fmt }} clientes</div></div>
+                <div class="metric"><div class="v">{{ pr.con_propuesta | fmt }}</div><div class="l">con corrección automática</div></div>
+              </div>
+              @if (pr.grupos?.length) {
+                <div class="grupos">
+                  @for (g of pr.grupos; track $index) {
+                    <div class="grupo"><span class="p">{{ g.valor_actual || 'vacío' }} → {{ g.propuesta || 'sin propuesta' }}</span><span class="bar"><i [style.width.%]="g.n / maxGrupo(pr) * 100"></i></span><span class="n">{{ g.n | fmt }}</span></div>
+                  }
+                </div>
+              }
+            </div>
+            <div class="prop-sec">
+              <div class="sec-t">Confirma con clientes reales<span class="r">{{ muestraRegla(pr).length | fmt }} de {{ pr.casos | fmt }}</span></div>
+              @if (pr.muestra?.length) {
+                <div class="filas-conf">
+                  @for (f of muestraRegla(pr); track $index) {
+                    @let k = clave(f, false);
+                    <div class="fila-conf" [class.si]="c.conf()[k] === 'si'" [class.no]="c.conf()[k] === 'no'">
+                      <div class="fc-cli"><b>{{ f.nombre || 'Cliente ' + f.an8 }}</b><span class="mono">{{ f.an8 }}</span></div>
+                      <div class="fc-cambio">
+                        <span class="cambio">
+                          <span class="campo">{{ f.campo }}</span>
+                          @if (!vacio(f.valor_actual)) {<span class="cur">{{ f.valor_actual }}</span>} @else {<span class="none">vacío</span>}
+                          <span class="arrow" aria-label="pasa a">→</span>
+                          @if (f.propuesta) {<span class="new">{{ f.propuesta }}</span>} @else {<span class="none">sin propuesta</span>}
+                        </span>
+                        <span class="motivo">{{ f.motivo }}</span>
+                      </div>
+                      <ng-container [ngTemplateOutlet]="botonesConf" [ngTemplateOutletContext]="{ k, n: f.nombre || 'el cliente ' + f.an8 }" />
+                    </div>
+                  }
+                </div>
+              } @else {
+                <p class="note">La regla no marca ningún caso.</p>
+              }
+            </div>
+          }
+
+          @if (p.supuestos.length) {
+            <div class="prop-sec"><div class="sec-t">Lo que he supuesto</div><ul class="supuestos">@for (s of p.supuestos; track $index) {<li>{{ s }}</li>}</ul></div>
+          }
+          <div class="prop-sec">
+            <div class="sec-t">Para activar</div>
+            <ul class="checks">@for (ch of r.checks; track $index) {<li [class.ok]="ch[1]">{{ ch[0] }}</li>}</ul>
+          </div>
+          <div class="prop-sec"><ng-container [ngTemplateOutlet]="tecnico" [ngTemplateOutletContext]="{ m }" /></div>
+          @if (c.activada(); as a) {
+            <div class="prop-sec" style="border-bottom:0">
+              <div class="confirm-box">
+                <svg class="i"><use href="#i-check" /></svg>
+                <span><b>Regla {{ a.rule_id }} activada (versión {{ a.version }}).</b> Sus casos aparecerán al ejecutar las reglas.</span>
+                <span class="btns"><button class="btn btn-sm btn-dark" (click)="ejecutarAhora()">Ejecutar ahora</button><a class="btn btn-sm" routerLink="/reglas">Ver en el catálogo</a></span>
+              </div>
+            </div>
+          } @else {
+            <div class="prop-actions">
+              <span class="hint">
+                @if (!r.no && r.minimo) {<b class="cnt">{{ r.si < r.minimo ? r.si : r.minimo }} de {{ r.minimo }} confirmados</b>}
+                {{ r.no ? 'Has marcado un caso como incorrecto: explícale al analista por qué.' : r.listo ? 'Todo listo para activar.' : 'Confirma la muestra y resuelve las dudas para activar.' }}
+              </span>
+              <button class="btn btn-accent btn-lg" [disabled]="!r.listo || c.ocupado() || sesion.ocupado()" (click)="c.activar()">
+                {{ c.reglaBase() ? 'Activar versión ' + (c.reglaBase()!.version + 1) : 'Activar regla' }}
+              </button>
+            </div>
+          }
+        </div>
+      }
+    </aside>
+  }
+</div>
+
+<ng-template #composer>
+  <div class="composer">
+    <textarea #prompt rows="2" [placeholder]="placeholder()" aria-label="Mensaje para el analista"
+      (keydown)="teclaEnCuadro($event)" (input)="autoAlto()"></textarea>
+    <div class="comp-foot">
+      <span class="hint">{{ c.ocupado() ? 'Esc para detener' : 'Intro para enviar; Mayús + Intro, nueva línea' }}</span>
+      @if (c.enCurso(); as ec) {
+        <button class="send stop" (click)="detener()" [disabled]="ec.cancelando || !ec.peticion_id" title="Detener (Esc)">{{ ec.cancelando ? 'Deteniendo…' : 'Detener' }}<svg><use href="#i-stop" /></svg></button>
+      } @else {
+        <button class="send" (click)="enviar()" [disabled]="!hayTexto()" [attr.title]="!hayTexto() ? 'Escribe tu petición' : null">Enviar<svg><use href="#i-send" /></svg></button>
+      }
+    </div>
+  </div>
+</ng-template>
+
+<ng-template #botonesConf let-k="k" let-n="n">
+  <div class="conf" role="group" [attr.aria-label]="'¿Es correcto el caso de ' + n + '?'">
+    <button class="btn" [class.sel-si]="c.conf()[k] === 'si'" [attr.aria-pressed]="c.conf()[k] === 'si'" [attr.aria-label]="'Bien: ' + n" (click)="c.confirmar(k, 'si')">Bien</button>
+    <button class="btn" [class.sel-no]="c.conf()[k] === 'no'" [attr.aria-pressed]="c.conf()[k] === 'no'" [attr.aria-label]="'Mal: ' + n" (click)="c.confirmar(k, 'no')">Mal</button>
+  </div>
+</ng-template>
+
+<ng-template #tecnico let-m="m">
+  <details class="tec">
+    <summary>Ver detalle técnico</summary>
+    <p class="note" style="margin:0 0 10px">
+      El analista genera esta consulta; se valida (solo lectura y tablas permitidas) y se ejecuta en BigQuery.
+      {{ m.tokens?.llamadas || 0 }} {{ m.tokens?.llamadas === 1 ? 'llamada' : 'llamadas' }} al modelo · {{ m.tokens?.entrada | fmt }} tokens de entrada y {{ m.tokens?.salida | fmt }} de salida · {{ m.segundos || 0 }} s.
+    </p>
+    <pre>{{ m.propuesta.sql }}</pre>
+    @if (m.propuesta.instruccion_ia) {
+      <p class="note" style="margin:12px 0 6px">Instrucción para la IA en cada candidato:</p>
+      <pre style="white-space:pre-wrap">{{ m.propuesta.instruccion_ia }}</pre>
+    }
+  </details>
+</ng-template>

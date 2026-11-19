@@ -1,0 +1,76 @@
+<div class="wrap">
+  <div class="head">
+    <div>
+      <h1>Incidencias</h1>
+      <p class="lead">Revisa lo que han encontrado las reglas: acepta lotes completos o decide caso a caso. Lo aceptado y corregido se exporta para cargarlo en JD Edwards.</p>
+    </div>
+    @if (sesion.puede('gestor') && !rev.confirmarEjecutar()) {
+      <div class="acc">
+        <button class="btn btn-dark" [disabled]="!!rev.ejecucion()" (click)="rev.confirmarEjecutar.set(true)">
+          @if (rev.ejecucion()) {<span class="spin"></span>Ejecutando reglas…} @else {<svg class="i" style="width:14px;height:14px"><use href="#i-play" /></svg>Ejecutar reglas}
+        </button>
+      </div>
+    }
+  </div>
+
+  @if (rev.confirmarEjecutar() && !rev.ejecucion()) {
+    <div class="confirm-box warn" style="margin-bottom:18px" role="alertdialog" aria-label="Confirmar la ejecución">
+      <span><b>¿Ejecutar las {{ sesion.inicio()?.reglas | fmt }} reglas vigentes sobre todo el maestro?</b> Puede tardar varios minutos y las reglas con IA consumen el modelo. Las incidencias de la ejecución anterior se sustituyen por las nuevas; las decisiones tomadas se conservan.</span>
+      <span class="btns">
+        <button class="btn btn-sm" (click)="rev.confirmarEjecutar.set(false)">Cancelar</button>
+        <button class="btn btn-sm btn-dark" (click)="rev.ejecutar()">Ejecutar las reglas</button>
+      </span>
+    </div>
+  }
+
+  @let i = sesion.inicio();
+  <section class="card resumen-ej" aria-label="Recorrido de las correcciones">
+    <p class="re-t"><b class="cnt">{{ i?.casos | fmt }}</b> incidencias en la última ejecución@if (i?.inicio) {<span class="note">, del {{ i!.inicio }}</span>}</p>
+    <app-recorrido [pendientes]="i?.pendientes || 0" [porExportar]="rev.porExportar()" [exportadas]="i?.exportadas || 0" [rechazadas]="i?.rechazadas || 0" />
+  </section>
+
+  <div class="modo">
+    <div class="seg" role="group" aria-label="Forma de revisar">
+      <button [attr.aria-pressed]="rev.modo() === 'lotes'" (click)="modo('lotes')">Por lotes</button>
+      <button [attr.aria-pressed]="rev.modo() === 'casos'" (click)="modo('casos')">Caso a caso</button>
+    </div>
+    <span class="sep" aria-hidden="true"></span>
+    <div class="seg" role="group" aria-label="Seguimiento">
+      <button [attr.aria-pressed]="rev.modo() === 'exportaciones'" (click)="modo('exportaciones')">Exportaciones</button>
+    </div>
+  </div>
+
+  @if (rev.modo() !== 'exportaciones' && (rev.porExportar() || ocupado())) {
+    @let n = rev.porExportar();
+    <div class="bar-dec" aria-live="polite">
+      @if (rev.confirmarExportar() && !ocupado()) {
+        <div class="confirm-box warn">
+          <span><b>¿Exportar {{ n | fmt }} {{ n === 1 ? 'corrección' : 'correcciones' }}?</b> Se genera el fichero para la carga en JD Edwards. Las que tengan conflicto entre reglas o cuyo valor haya cambiado en el maestro desde que se detectaron quedan retenidas.</span>
+          <span class="btns">
+            <button class="btn btn-sm" (click)="rev.confirmarExportar.set(false)">Cancelar</button>
+            <button class="btn btn-sm btn-accent" [disabled]="sesion.ocupado()" (click)="rev.exportar()">Exportar {{ n | fmt }} {{ n === 1 ? 'corrección' : 'correcciones' }}</button>
+          </span>
+        </div>
+      } @else {
+        <div class="confirm-box">
+          <span><b>{{ n | fmt }} {{ n === 1 ? 'corrección' : 'correcciones' }} por exportar</b> (aceptadas o corregidas)@if (rev.guardando()) { · guardando {{ rev.guardando() | fmt }}…}
+            @if (!sesion.puede('administrador')) {<span class="just">Un administrador las exportará para la carga en JD Edwards.</span>}
+            @else if (!sesion.yo()?.exportacion) {<span class="just">La exportación no está configurada en el servidor: avisa al equipo técnico.</span>}
+          </span>
+          <span class="btns">
+            <button class="btn btn-sm" [disabled]="!n" (click)="rev.verPorExportar()">Ver</button>
+            @if (sesion.puede('administrador')) {
+              <button class="btn btn-sm btn-accent" [disabled]="!n || ocupado() || !sesion.yo()?.exportacion" (click)="rev.confirmarExportar.set(true)">Exportar correcciones</button>
+            }
+          </span>
+        </div>
+      }
+    </div>
+  }
+
+  @switch (rev.modo()) {
+    @case ('lotes') { <app-lotes /> }
+    @case ('casos') { <app-casos /> }
+    @case ('exportaciones') { <app-exportaciones /> }
+  }
+</div>

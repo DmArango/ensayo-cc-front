@@ -1,0 +1,34 @@
+<div class="wrap" style="max-width:980px">
+  <div class="head">
+    <div>
+      <h1>Historial</h1>
+      <p class="lead">Quién hizo qué y cuándo en los últimos 180 días: reglas, ejecuciones, decisiones, exportaciones y cambios en el conocimiento.</p>
+    </div>
+  </div>
+  <div class="toolbar">
+    <div class="seg" role="group" aria-label="Tipo de actividad">
+      @for (x of filtros; track x[0]) {<button [attr.aria-pressed]="filtro() === x[0]" (click)="elegir(x[0])">{{ x[1] }}</button>}
+    </div>
+  </div>
+  <div class="card">
+    <ul class="tl">
+      @if (!lista()) {
+        <li><div class="loading"><span class="spin"></span>Cargando…</div></li>
+      } @else {
+        @for (h of lista(); track $index) {
+          @let ico = icono(h.tipo);
+          <li>
+            <span class="ico" [class]="'ico ' + ico[0]"><svg><use [attr.href]="'#' + ico[1]" /></svg></span>
+            <div class="what">{{ h.texto }}<small>{{ h.detalle }}{{ h.detalle ? ' · ' : '' }}{{ h.usuario }}</small></div>
+            <div class="when">{{ h.fecha }}</div>
+          </li>
+        } @empty {
+          <li><div class="vacio" style="grid-column:1/4">{{ VACIO[filtro()] }}</div></li>
+        }
+      }
+    </ul>
+    @if (hayMas()) {
+      <button class="mas" [disabled]="cargandoMas()" (click)="mas()">{{ cargandoMas() ? 'Cargando…' : 'Ver actividad anterior' }}</button>
+    }
+  </div>
+</div>

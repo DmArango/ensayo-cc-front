@@ -1,0 +1,108 @@
+<div class="split">
+  <div class="queue">
+    @let ls = rev.lotes();
+    <div class="queue-h">Lotes pendientes@if (ls?.length) {<span class="cnt">{{ ls!.length | fmt }}{{ ls!.length >= 200 ? '+' : '' }}</span>}</div>
+    <div class="lista" style="max-height:620px;overflow:auto">
+      @if (!ls) {
+        <div class="loading"><span class="spin"></span>Cargando…</div>
+      } @else {
+        @for (l of ls; track claveLote(l)) {
+          <button class="qitem" [attr.aria-current]="claveLote(rev.lote()) === claveLote(l)" (click)="rev.seleccionarLote(l)">
+            <span class="dot" [class.ia]="l.tipo === 'ia_razonamiento'" [class.manual]="l.tipo !== 'ia_razonamiento' && !l.con_propuesta"></span>
+            <span class="name">{{ l.lote }}</span><span class="n cnt">{{ l.pendientes | fmt }}</span>
+            <span class="meta">
+              <span class="rid">{{ l.rule_id }}</span><span class="t">{{ l.titulo }}</span>
+              @if (l.tipo === 'ia_razonamiento') {<span class="tag tag-ia">IA</span>}
+              @if (!l.con_propuesta) {<span class="tag">Sin propuesta</span>}
+            </span>
+          </button>
+        } @empty {
+          <div class="vacio">Sin lotes pendientes.</div>
+        }
+      }
+    </div>
+  </div>
+
+  <div>
+    @if (rev.lote(); as l) {
+      @let ia = l.tipo === 'ia_razonamiento';
+      @let m = rev.muestra();
+      @let n = rev.aAceptar();
+      @let ex = rev.excluidos().size;
+      <div class="card det">
+        <div class="det-h">
+          <div>
+            <h2>{{ l.lote }}</h2>
+            <div class="note"><span class="rid">{{ l.rule_id }}</span> {{ l.titulo }}</div>
+            <div class="note">{{ l.pendientes | fmt }} casos pendientes, {{ l.con_propuesta === l.pendientes ? 'todos con propuesta' : (l.con_propuesta | fmt) + ' con propuesta' }}@if (l.aprobadas) {; {{ l.aprobadas | fmt }} ya aprobados}</div>
+          </div>
+          <div class="btns">@if (ia) {<span class="tag tag-ia">Revisado con IA</span>} @else {<span class="tag">Regla determinista</span>}</div>
+        </div>
+        <div class="sec-t">Muestra de {{ m ? (m.length | fmt) : '…' }} casos@if (!ia && sesion.puede('revisor')) {<span class="r">Marca los que no quieras cambiar</span>}</div>
+        <div class="tablewrap">
+          <table>
+            <thead><tr>@if (!ia) {<th style="width:56px">Excluir</th>}<th>Cliente</th>@if (ia) {<th>Texto actual</th><th>Texto propuesto</th>} @else {<th>Cambio</th>}</tr></thead>
+            <tbody>
+              @if (!m) {
+                <tr><td colspan="4"><div class="loading"><span class="spin"></span>Cargando la muestra…</div></td></tr>
+              } @else {
+                @for (f of m; track k(f)) {
+                  <tr [class.excl]="excluido(f)">
+                    @if (!ia) {
+                      <td>@if (f.propuesta && sesion.puede('revisor')) {<input type="checkbox" [attr.aria-label]="'Excluir el cliente ' + f.an8" [checked]="excluido(f)" (change)="marcar(f, $event)">}</td>
+                    }
+                    <td>{{ f.nombre }}<span class="just"><span class="mono">{{ f.an8 }}</span>@if (f.pais) {, <span class="mono">{{ f.pais }}</span>}</span></td>
+                    @if (ia) {
+                      <td style="max-width:300px">
+                        @if (vacio(f.valor_actual)) {<span class="none">vacío</span>} @else {<span class="texto" style="display:block;margin:0">{{ f.valor_actual }}</span>}
+                      </td>
+                      <td style="max-width:320px">
+                        @if (f.propuesta) {<span class="texto new-t" style="display:block;margin:0">{{ f.propuesta }}</span>} @else {<span class="none">Sin propuesta</span>}
+                        <span class="just">{{ f.motivo }}</span>
+                      </td>
+                    } @else {
+                      <td>
+                        <span class="cambio">
+                          @if (vacio(f.valor_actual)) {<span class="none">vacío</span>} @else {<span class="cur">{{ f.valor_actual }}</span>}
+                          <span class="arrow" aria-label="pasa a">→</span>
+                          @if (f.propuesta) {<span class="new">{{ f.propuesta }}</span>} @else {<span class="none">sin propuesta</span>}
+                        </span>
+                        @if (!f.propuesta) {<span class="just">{{ f.motivo }}</span>}
+                      </td>
+                    }
+                  </tr>
+                }
+              }
+            </tbody>
+          </table>
+        </div>
+        <div class="abar">
+          @if (!sesion.puede('revisor')) {
+            <span class="info">Para decidir las incidencias necesitas el perfil de revisor.</span>
+            <button class="btn push" (click)="rev.revisarLote()">Ver caso a caso</button>
+          } @else if (ia) {
+            <span class="info">Los casos revisados con IA se deciden uno a uno: revisa el texto propuesto y la justificación de cada caso.</span>
+            <button class="btn btn-accent push" (click)="rev.revisarLote()">Revisar caso a caso</button>
+          } @else if (!l.con_propuesta) {
+            <span class="info">Sin propuesta automática: indica el valor correcto en cada caso.</span>
+            <button class="btn btn-accent push" (click)="rev.revisarLote()">Revisar caso a caso</button>
+          } @else if (rev.confirmarLote()) {
+            <div class="confirm-box warn" style="flex:1">
+              <span><b>¿Aceptar {{ n | fmt }} propuestas?</b> Quedarán como correcciones por exportar y se incluirán en la próxima exportación.@if (ex) { {{ ex === 1 ? 'El excluido queda pendiente.' : ex + ' excluidos quedan pendientes.' }}}</span>
+              <span class="btns">
+                <button class="btn btn-sm" (click)="rev.confirmarLote.set(false)">Cancelar</button>
+                <button class="btn btn-sm btn-accent" [disabled]="sesion.ocupado()" (click)="rev.aceptarLote()">Aceptar {{ n | fmt }} propuestas</button>
+              </span>
+            </div>
+          } @else {
+            <span class="info"><b>{{ n | fmt }}</b> propuestas se aceptarán@if (ex) {; <b>{{ ex }}</b> {{ ex === 1 ? 'excluido queda pendiente' : 'excluidos quedan pendientes' }}}</span>
+            <button class="btn push" (click)="rev.revisarLote()">Revisar caso a caso</button>
+            <button class="btn btn-accent" (click)="rev.confirmarLote.set(true)">Aceptar el lote</button>
+          }
+        </div>
+      </div>
+    } @else if (rev.lotes()) {
+      <div class="card"><div class="vacio">No hay incidencias pendientes. Ejecuta las reglas para buscar nuevas.</div></div>
+    }
+  </div>
+</div>

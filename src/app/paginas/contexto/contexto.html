@@ -1,0 +1,44 @@
+<div class="wrap">
+  <div class="head">
+    <div>
+      <h1>Contexto de negocio</h1>
+      <p class="lead">Políticas, convenciones y vocabulario de Acerinox que el analista tiene en cuenta al interpretar una petición y al revisar textos con IA. Lo que se añada o cambie aquí lo usa desde el siguiente mensaje.</p>
+    </div>
+    @if (sesion.puede('gestor') && !abierto()) {
+      <div class="acc"><button class="btn btn-dark" (click)="abrir()"><svg class="i" style="width:14px;height:14px"><use href="#i-plus" /></svg>Añadir conocimiento</button></div>
+    }
+  </div>
+  <div class="kform" [class.open]="abierto()">
+    <label class="sec-t" for="nota">{{ editando() ? 'Modificar la nota' : 'Nueva nota' }}</label>
+    <textarea #texto id="nota" aria-label="Conocimiento de negocio" (input)="error.set('')"
+      placeholder="Explícalo como a una persona nueva en el equipo. Por ejemplo: los clientes de Reino Unido facturan siempre en GBP."></textarea>
+    @if (error()) {<div class="form-err" style="margin:8px 0 0" role="alert">{{ error() }}</div>}
+    <div class="btns">
+      <button class="btn btn-sm" (click)="cerrar()">Cancelar</button>
+      <button class="btn btn-dark btn-sm" [disabled]="sesion.ocupado()" (click)="guardar()">{{ editando() ? 'Guardar cambios' : 'Añadir' }}</button>
+    </div>
+  </div>
+  <div class="kgrid">
+    @if (!notas()) {
+      <div class="loading"><span class="spin"></span>Cargando…</div>
+    } @else {
+      @for (n of notas(); track n.id) {
+        <div class="kcard">
+          <p>{{ n.texto }}</p>
+          <div class="foot">
+            <span>{{ n.autor }}</span>
+            @if (sesion.puede('gestor')) {
+              <span>
+                <button class="link" style="color:var(--accent)" (click)="abrir(n)">Editar</button>
+                <span class="muted"> · </span>
+                <button class="link" (click)="borrar(n)">{{ quitar() === n.id ? '¿Quitar? Pulsa otra vez' : 'Quitar' }}</button>
+              </span>
+            }
+          </div>
+        </div>
+      } @empty {
+        <div class="vacio">Todavía no hay conocimiento de negocio. Añade la primera nota para que el analista la tenga en cuenta.</div>
+      }
+    }
+  </div>
+</div>
