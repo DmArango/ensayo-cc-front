@@ -1,0 +1,216 @@
+@let f = rev.f();
+@let cs = rev.cas();
+<div class="filtros">
+  <div class="seg" role="group" aria-label="Situación">
+    @for (s of SITUACIONES; track s) {
+      <button [attr.aria-pressed]="f.situacion === s" (click)="situacion(s)">{{ SIT_T[s] }}@if (cuenta(s)) {<span class="c">{{ cuenta(s) | fmt }}</span>}</button>
+    }
+  </div>
+  <select class="sel" aria-label="Regla" (change)="elegir('rule_id', $event)">
+    <option value="" [selected]="!f.rule_id">Todas las reglas</option>
+    @for (x of opciones(cs?.reglas, f.rule_id); track x.v) {<option [value]="x.v" [selected]="x.v === f.rule_id">{{ x.v }}{{ x.t ? ' · ' + x.t : '' }} ({{ x.n | fmt }})</option>}
+  </select>
+  @if (f.rule_id) {
+    <select class="sel" aria-label="Lote" (change)="elegir('lote', $event)">
+      <option value="" [selected]="!f.lote">Todos los lotes de la regla</option>
+      @for (x of opciones(cs?.lotes, f.lote); track x.v) {<option [value]="x.v" [selected]="x.v === f.lote">{{ x.v }} ({{ x.n | fmt }})</option>}
+    </select>
+  }
+  <select class="sel" aria-label="País" (change)="elegir('pais', $event)">
+    <option value="" [selected]="!f.pais">Todos los países</option>
+    @for (x of opciones(cs?.paises, f.pais); track x.v) {<option [value]="x.v" [selected]="x.v === f.pais">{{ x.t || x.v }} ({{ x.n | fmt }})</option>}
+  </select>
+  <input class="search" type="search" placeholder="Cliente: número o nombre" aria-label="Buscar cliente" [value]="f.q"
+    (input)="buscar($event)" (keydown.enter)="buscar($event, true)">
+</div>
+
+<div class="split">
+  <div class="queue">
+    <div class="queue-h">{{ SIT_T[f.situacion] }}@if (cs) {<span class="cnt">{{ cabecera() }}</span>}</div>
+    <div #lista class="lista" style="max-height:620px;overflow:auto">
+      @if (!cs) {
+        <div class="loading"><span class="spin"></span>Cargando…</div>
+      } @else {
+        @for (c of cs.casos; track c.orden; let i = $index) {
+          @let e = rev.estado(c);
+          <button class="qitem" [class.hecho]="e.hecho" [attr.aria-current]="i === rev.ci()" (click)="rev.irCaso(i)">
+            <span class="dot" [class]="'dot ' + e.dot"></span>
+            <span class="name">{{ c.nombre || 'Cliente ' + c.an8 }}</span><span class="n">{{ c.an8 }}</span>
+            <span class="meta"><span class="rid">{{ c.rule_id }}</span><span class="t">{{ c.campo }}</span>@if (e.tag) {<span class="tag" [class]="'tag ' + e.tagClase" [attr.title]="c.error_carga && !e.hecho ? c.error_carga : null">{{ e.tag }}</span>}</span>
+          </button>
+        } @empty {
+          <div class="vacio">{{ f.situacion === 'pendiente' ? 'No quedan casos pendientes con estos filtros.' : 'No hay casos con estos filtros.' }}</div>
+        }
+        @if (cs.quedan > 0) {
+          <button class="mas" (click)="rev.cargarCasos(true)">{{ textoMas(cs.quedan) }}</button>
+        }
+      }
+    </div>
+  </div>
+
+  <div>
+    @if (rev.actual(); as c) {
+      @let ia = c.tipo === 'ia_razonamiento';
+      @let e = rev.estado(c);
+      @let act = (c.valor_actual || '').trim();
+      @let fc = ficha();
+      @let v = fc?.v;
+      @let puede = sesion.puede('revisor') && c.situacion !== 'exportada';
+      <div class="card det caso-det">
+        <div class="det-h">
+          <div>
+            <h2>{{ c.nombre || 'Cliente ' + c.an8 }}</h2>
+            <div class="chips">
+              <span>Cliente <b>{{ c.an8 }}</b></span>
+              <span>{{ v?.cli?.ciudad ? suave(v!.cli!.ciudad) + ', ' : '' }}<b class="mono">{{ v?.cli?.pais || nombrePais(c.pais) }}</b>{{ v?.cli?.region ? ' (' + v!.cli!.region + ')' : '' }}</span>
+              @if (v?.cli?.tipo) {<span>Tipo <b class="mono">{{ v!.cli!.tipo }}</b>{{ v!.estado ? ', ' + v!.estado.toLowerCase() : '' }}</span>}
+              @if (fc?.f && !v?.cli) {<span class="tag tag-warn mini">Ya no está en el maestro</span>}
+            </div>
+          </div>
+          <div class="btns">@if (ia) {<span class="tag tag-ia">Revisado con IA</span>} @else {<span class="tag">Regla determinista</span>}</div>
+        </div>
+
+        <div class="bloque">
+          <div class="sec-t">
+            <span><span class="rid">{{ c.rule_id }}</span> {{ c.titulo }}</span>
+            <span class="r">@if (v && !v.corregible) {<span class="tag tag-warn mini" title="Es un dato derivado o agregado: la corrección no se puede cargar en JD Edwards">No se carga en JD Edwards</span>}@if (v?.inactivo) { <span class="tag tag-warn mini">inactivo</span>}</span>
+          </div>
+          @if (e.hecho) {
+            <div class="confirm-box estado-dec" [class.bad]="e.a === 'rechazar'">
+              <span><b>{{ textoDecision(c) }}</b>
+                {{ e.a === 'exportada' ? 'Pendiente de la carga en JD Edwards.' : e.a === 'rechazar' ? 'No es un error: deja de estar pendiente.' : 'Se incluirá en la próxima exportación.' }}
+                <span class="just">{{ quien(c) }}</span></span>
+              <span class="btns">
+                @if (c.guardando) {<span class="spin"></span>}
+                @else if (puede) {<button class="btn btn-sm" (click)="rev.decidir('deshacer')">Volver a pendiente</button>}
+              </span>
+            </div>
+          } @else if (c.error_carga) {
+            <div class="confirm-box estado-dec bad" role="note">
+              <span><b>La carga en JD Edwards dio error.</b> {{ c.error_carga }}
+                <span class="just">El caso vuelve a estar pendiente: revísalo y decide de nuevo.</span></span>
+            </div>
+          }
+          <div class="campo-t">{{ c.campo }}<span class="mono">{{ c.columna }}</span></div>
+          <div class="cmp">
+            <div class="box"><div class="k">Valor actual</div>
+              @if (act) {<div class="v" [class.txt]="ia">{{ act }}</div>} @else {<div class="v"><span class="none">vacío</span></div>}
+            </div>
+            <div class="box" [class.prop]="c.propuesta"><div class="k">Propuesta</div>
+              @if (c.propuesta) {<div class="v" [class.txt]="ia">{{ c.propuesta }}</div>} @else {<div class="v"><span class="none">Sin propuesta automática: indica el valor con «Corregir»</span></div>}
+            </div>
+          </div>
+          <div class="why"><b>{{ ia ? 'Justificación de la IA' : 'Motivo' }}</b>{{ c.motivo }}</div>
+
+          @if (!fc?.f) {
+            @if (fc?.error) {
+              <div class="note">No se ha podido cargar la ficha del cliente: {{ fc!.error }} · <button class="link" (click)="rev.reintentarFicha(c)">Reintentar</button></div>
+            } @else {
+              <div class="loading" style="padding:8px 0"><span class="spin"></span>Cargando la ficha del cliente…</div>
+            }
+          } @else {
+            @if (v!.habitual.length) {
+              <div class="ctx uno">
+                <div class="p">
+                  <h4>Lo habitual en «{{ c.campo || 'este campo' }}» para clientes de {{ v!.cli?.pais || c.pais || 'su país' }}</h4>
+                  @for (h of v!.habitual; track h.v) {
+                    <div class="dist">
+                      <span class="v">@if (h.v) {<span>{{ h.v }}</span>} @else {<span class="none">vacío</span>}</span>
+                      <span class="bar"><i [class]="h.clase" [style.width.%]="h.pct > 2 ? h.pct : 2"></i></span>
+                      <span class="n">{{ (h.pct + '').replace('.', ',') }} %</span>
+                      @if (h.igual) {<span class="tag mini" [class.tag-ok]="h.igual === 'propuesta'">{{ h.igual }}</span>}
+                    </div>
+                  }
+                  <div class="note" style="margin-top:6px">Sobre {{ v!.totalHabitual | fmt }} clientes</div>
+                </div>
+              </div>
+            }
+          }
+        </div>
+
+        <div class="acciones fija">
+          @if (puede) {
+            <button class="btn btn-ok" [disabled]="!c.propuesta" [attr.title]="c.propuesta ? null : 'Sin propuesta: usa Corregir'" (click)="rev.decidir('aceptar')"><svg class="i" style="width:14px;height:14px"><use href="#i-check" /></svg>Aceptar <kbd>A</kbd></button>
+            <button class="btn" (click)="abrirForm('corregir')">Corregir <kbd>C</kbd></button>
+            <button class="btn btn-danger" (click)="abrirForm('rechazar')"><svg class="i" style="width:14px;height:14px"><use href="#i-x" /></svg>Rechazar <kbd>R</kbd></button>
+          } @else if (!sesion.puede('revisor')) {
+            <span class="note">Para decidir necesitas el perfil de revisor.</span>
+          }
+          <span class="nav-caso">
+            <span class="note">{{ rev.ci() + 1 | fmt }} de {{ cs!.total | fmt }}</span>
+            <button class="icon-btn" aria-label="Caso anterior" [disabled]="!rev.ci()" (click)="rev.moverCaso(-1)">‹</button>
+            <button class="icon-btn" aria-label="Caso siguiente" [disabled]="rev.ci() + 1 >= cs!.total" (click)="rev.moverCaso(1)">›</button>
+          </span>
+        </div>
+
+        @if (rev.form() === 'corregir') {
+          <div class="decform">
+            <label for="decValor">Valor correcto para «{{ c.campo || 'el campo' }}»</label>
+            @if (ia) {
+              <textarea id="decValor" #campoForm rows="3" [value]="valorForm()" (input)="escribir($event)"></textarea>
+            } @else {
+              <input id="decValor" #campoForm autocomplete="off" [value]="valorForm()" (input)="escribir($event)">
+            }
+            @if (rev.formError()) {<div class="err">{{ rev.formError() }}</div>}
+            <div class="pie"><span class="hint">Intro para guardar · Esc para cancelar</span><button class="btn btn-sm" (click)="rev.cerrarForm()">Cancelar</button><button class="btn btn-sm btn-ok" (click)="guardarForm()">Guardar corrección</button></div>
+          </div>
+        }
+        @if (rev.form() === 'rechazar') {
+          <div class="decform">
+            <label for="decMotivo">¿Por qué no es un error?</label>
+            <input id="decMotivo" #campoForm autocomplete="off" placeholder="Por ejemplo: excepción acordada con el área comercial" [value]="valorForm()" (input)="escribir($event)">
+            @if (rev.formError()) {<div class="err">{{ rev.formError() }}</div>}
+            <div class="pie"><span class="hint">Intro para guardar · Esc para cancelar</span><button class="btn btn-sm" (click)="rev.cerrarForm()">Cancelar</button><button class="btn btn-sm btn-danger" (click)="guardarForm()">Rechazar el caso</button></div>
+          </div>
+        }
+
+        @if (v) {
+          <div class="ficha-datos">
+            <div class="bloque">
+              <div class="sec-t">Sus datos en el maestro<span class="r">{{ fc!.f!.modificado ? 'Actualizado el ' + fc!.f!.modificado : '' }}</span></div>
+              <div class="reg">
+                @for (d of v.datos; track d.col) {
+                  <div [class.on]="d.on" [class.inc]="d.inc" [attr.title]="d.titulo">
+                    <div class="k">{{ d.nombre }}</div>
+                    <div class="v">@if (d.valor) {<span>{{ d.valor }}</span>} @else {<span class="none">vacío</span>}@if (d.sig) {<span class="sig"> · {{ d.sig }}</span>}</div>
+                  </div>
+                }
+              </div>
+              @if (v.pend.size) {<div class="note" style="margin-top:6px"><span class="pto"></span>Campo con otra incidencia pendiente</div>}
+            </div>
+            @if (v.otrasInc.length) {
+              <div class="bloque">
+                <div class="sec-t">Otras incidencias del cliente<span class="r">{{ v.otrasInc.length | fmt }}{{ v.otrasInc.length >= 12 ? '+' : '' }}</span></div>
+                <ul class="otras">
+                  @for (o of v.otrasInc; track $index) {
+                    <li [class.click]="o.i >= 0" [attr.title]="o.i >= 0 ? 'Abrir este caso' : null" (click)="o.i >= 0 && rev.irCaso(o.i)">
+                      <span class="rid">{{ o.rule_id }}</span>
+                      <span class="t">{{ o.campo }}</span>
+                      <span class="cambio"><span class="cur">{{ o.valor_actual ? corta(o.valor_actual, 28) : 'vacío' }}</span><span class="arrow">→</span>@if (o.propuesta) {<span class="new">{{ corta(o.propuesta, 28) }}</span>} @else {<span class="none">sin propuesta</span>}</span>
+                      @if (o.tag[0]) {<span class="tag" [class]="'tag ' + o.tag[1]">{{ o.tag[0] }}</span>}
+                    </li>
+                  }
+                </ul>
+              </div>
+            }
+            @if (v.decisiones.length) {
+              <div class="bloque">
+                <div class="sec-t">Decisiones anteriores sobre el cliente</div>
+                <ul class="otras dec">
+                  @for (d of v.decisiones; track $index) {
+                    <li><span class="when">{{ d.fecha }}</span><span>{{ d.verbo }} · <span class="rid">{{ d.rule_id }}</span>{{ d.extra }}<span class="just">{{ d.usuario }}</span></span></li>
+                  }
+                </ul>
+              </div>
+            }
+          </div>
+        }
+        @if (puede) {
+          <div class="teclas"><span><kbd>A</kbd> aceptar</span><span><kbd>C</kbd> corregir</span><span><kbd>R</kbd> rechazar</span><span><kbd>←</kbd><kbd>→</kbd> caso anterior o siguiente</span></div>
+        }
+      </div>
+    } @else if (cs) {
+      <div class="card"><div class="vacio">{{ f.situacion === 'pendiente' ? 'Nada pendiente con estos filtros. Prueba con otra regla o revisa lo que está por exportar.' : 'Sin casos.' }}</div></div>
+    }
+  </div>
+</div>

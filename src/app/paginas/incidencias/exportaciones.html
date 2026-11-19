@@ -1,0 +1,76 @@
+@if (rev.resultado(); as r) {
+  <div class="card det" style="margin-bottom:18px">
+    <div class="det-h">
+      <div>
+        <h2>{{ r.correcciones | fmt }} {{ r.correcciones === 1 ? 'corrección exportada' : 'correcciones exportadas' }}@if (r.retenidas) { y {{ r.retenidas | fmt }} {{ r.retenidas === 1 ? 'retenida' : 'retenidas' }}}</h2>
+        <div class="note">
+          @if (r.uri) {El fichero está listo para la carga en JD Edwards.}
+          @else if (r.exportacion_id) {La exportación {{ r.exportacion_id }} está registrada, pero falta escribir el fichero: usa «Escribirlo ahora» en la lista.}
+        </div>
+      </div>
+      <div class="btns"><button class="btn btn-sm" (click)="rev.resultado.set(null)">Cerrar</button></div>
+    </div>
+    @if (r.retenidas_detalle.length) {
+      <div class="sec-t">Retenidas: siguen por exportar hasta que se resuelvan</div>
+      <ul class="supuestos" style="margin:0 0 12px">
+        @for (x of motivos(r.retenidas_detalle); track x.motivo) {
+          <li><span><b>{{ x.motivo }} ({{ x.n | fmt }}).</b> {{ queHacer(x.motivo) }}</span></li>
+        }
+      </ul>
+      <div class="tablewrap" style="max-height:360px">
+        <table>
+          <thead><tr><th>Cliente</th><th>Regla</th><th>Campo</th><th>Valor actual → nuevo</th><th>Motivo</th></tr></thead>
+          <tbody>
+            @for (x of r.retenidas_detalle; track $index) {
+              <tr>
+                <td class="mono">{{ x.an8 }}</td>
+                <td><span class="rid">{{ x.rule_id }}</span></td>
+                <td class="mono">{{ x.columna }}</td>
+                <td><span class="cur">{{ x.valor_actual || 'vacío' }}</span> → <span class="new">{{ x.nuevo }}</span></td>
+                <td>{{ x.retenida }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <div style="margin-top:12px"><button class="btn btn-sm btn-accent" (click)="rev.verPorExportar()">Revisar los casos por exportar</button></div>
+    }
+  </div>
+}
+
+<div class="tablewrap">
+  <table>
+    <thead><tr><th>Exportación</th><th>Por</th><th class="num">Correcciones</th><th class="num">Retenidas</th><th>Carga en JD Edwards</th><th>Fichero</th></tr></thead>
+    <tbody>
+      @if (!rev.exportaciones()) {
+        <tr><td colspan="6"><div class="loading"><span class="spin"></span>Cargando…</div></td></tr>
+      } @else {
+        @for (e of rev.exportaciones(); track e.exportacion_id) {
+          <tr>
+            <td><span class="cnt" style="font-weight:600">{{ e.exportacion_id }}</span><span class="just">{{ e.fecha }}</span></td>
+            <td>{{ e.usuario }}</td>
+            <td class="num mono">{{ e.correcciones | fmt }}</td>
+            <td class="num mono">{{ e.retenidas | fmt }}</td>
+            <td>
+              <span class="tag" [class.tag-warn]="!e.volcadas && !e.errores" [class.tag-ok]="e.volcadas && !e.errores" [class.tag-bad]="e.errores">{{ carga(e) }}</span>
+              @if (e.errores) {<span class="just">Las que dieron error vuelven a estar pendientes de revisión.</span>}
+            </td>
+            <td>
+              <a class="link" [href]="rev.urlCsv(e.exportacion_id)" download>Descargar CSV</a>
+              @if (e.uri) {
+                <details class="ubicacion"><summary class="just">Ubicación en Cloud Storage</summary><span class="just mono" style="overflow-wrap:anywhere">{{ e.uri }}</span></details>
+              } @else if (sesion.puede('administrador')) {
+                <span class="just">Falta escribir el fichero para la carga · <button class="link" [disabled]="sesion.ocupado()" (click)="rev.escribirFichero(e.exportacion_id)">Escribirlo ahora</button></span>
+              } @else {
+                <span class="just">Falta escribir el fichero para la carga: un administrador puede hacerlo.</span>
+              }
+            </td>
+          </tr>
+        } @empty {
+          <tr><td colspan="6"><div class="vacio">Todavía no se ha exportado ninguna corrección.</div></td></tr>
+        }
+      }
+    </tbody>
+  </table>
+</div>
+<p class="note" style="margin-top:12px">Cada exportación genera un fichero con lo aprobado: cliente, campo, dónde se carga en JD Edwards (tabla, columna y, si hace falta, compañía), valor anterior y nuevo, reglas y quién lo aprobó. El proceso de carga de Acerinox lo vuelca en JD Edwards y registra el resultado de cada corrección.</p>
